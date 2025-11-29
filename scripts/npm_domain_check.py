@@ -23,6 +23,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRIPT_NAME = os.path.splitext(os.path.basename(__file__))[0]
 CONFIG_PATH = os.path.join(SCRIPT_DIR, SCRIPT_NAME + ".json")
 
+# Counts running instances of this script
+SCRIPT_NAME = os.path.basename(sys.argv[0])
+def count_instances():
+    pid_self = str(os.getpid())
+    result = subprocess.run(
+        ["pgrep", "-f", SCRIPT_NAME],
+        capture_output=True,
+        text=True
+    )
+    pids = [p for p in result.stdout.split() if p != pid_self]
+    return len(pids)
+
 # Command execution helper
 def run_command(cmd):
     # Runs a shell command and returns stdout, stderr, returncode.
@@ -38,7 +50,7 @@ def run_command(cmd):
 def container_exists(name):
     stdout, stderr, rc = run_command(["docker", "ps", "-a", "--format", "{{.Names}}"])
     if rc != 0:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error in querying Docker containers: {stderr}")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Error in querying Docker containers: {stderr}")
         sys.exit(1)
     return name in stdout.splitlines()
 
@@ -46,7 +58,7 @@ def container_exists(name):
 def get_env_from_container(name):
     stdout, stderr, rc = run_command(["docker", "exec", name, "env"])
     if rc != 0:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error reading environment variables from container '{name}': {stderr}")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Error reading environment variables from container '{name}': {stderr}")
         sys.exit(1)
 
     env = {}
@@ -76,9 +88,9 @@ def update_ip_in_container(container, old_ip, new_ip):
     _, stderr, rc = run_command(cmd)
 
     if rc != 0:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error running sed in container: {stderr}")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Error running sed in container: {stderr}")
     else:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] sed executed in container: {old_ip} → {new_ip}")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] sed executed in container: {old_ip} → {new_ip}")
 
 # Reloads nginx inside container.
 def reload_nginx(container):
@@ -86,7 +98,7 @@ def reload_nginx(container):
     if rc == 0:
         print("Nginx successfully reloaded.")
     else:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error reloading Nginx: {stderr}")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Error reloading Nginx: {stderr}")
 
 
 # Loads JSON config from file.
@@ -108,7 +120,7 @@ def save_config(data):
 def main():
     # STEP 1: check container existence
     if not container_exists(CONTAINER_NAME):
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Container '{CONTAINER_NAME}' does not exist.")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Container '{CONTAINER_NAME}' does not exist.")
         sys.exit(0)
 
     # STEP 2: load JSON configuration
@@ -151,7 +163,7 @@ def main():
             ssl_disabled=True,
         )
     except mysql.connector.Error as err:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] DB connection error: {err}")
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] DB connection error: {err}")
         sys.exit(1)
 
     cursor = conn.cursor(dictionary=True)
@@ -179,7 +191,7 @@ def main():
                 conn.commit()
                 print("Column 'domain' successfully created.")
             except mysql.connector.Error as err:
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error creating column 'domain': {err}")
+                print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Error creating column 'domain': {err}")
                 sys.exit(1)
 
         # STEP 5.2: fetch all rows from access_list_client
@@ -215,7 +227,7 @@ def main():
                     "UPDATE access_list_client SET domain=%s WHERE id=%s",
                     (domain, db_row["id"])
                 )
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Domain for IP {ip} restored: {domain}")
+                print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Domain for IP {ip} restored: {domain}")
                 updated_count += 1
 
         # STEP 5.5: resolve domains and update IPs
@@ -243,7 +255,7 @@ def main():
                         "UPDATE access_list_client SET address=%s WHERE id=%s",
                         (new_address, row_id)
                     )
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] IP updated for {domain}: {ip_old} → {ip_new}")
+                    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] IP updated for {domain}: {ip_old} → {ip_new}")
 
                     update_ip_in_container(CONTAINER_NAME, ip_old, ip_new)
                     nginx_reload_needed = True
@@ -263,7 +275,7 @@ def main():
             reload_nginx(CONTAINER_NAME)
 
         if updated_count > 0:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Total changes: {updated_count}")
+            print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Total changes: {updated_count}")
 
     # STEP 7: Cleanup
     finally:
@@ -272,4 +284,9 @@ def main():
 
 # Run main function
 if __name__ == "__main__":
+    count = count_instances()
+    if count > 1:
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] SKIP: Skript {SCRIPT_NAME} läuft bereits ({count} Prozesse gefunden)")
+        sys.exit(1)
+
     main()
