@@ -12,24 +12,33 @@ Ensure you are created the access-list first in NPM with ip and a network `/32` 
   "140.82.121.4": "github.com"
 }
 ```
+
 ---
 ### If you want to use the script, follow these steps:
+
 1. Use a container_name in docker-compose or run command:
 ```yaml
 services:
   app:
     container_name: npm # For example
 ```
-2. Copy `npm_domain_check.py` script to `/usr/local/bin/npm_domain_check.py` in your docker-machine (not into container)
+
+2. Copy `npm_domain_check.py` script to `/usr/local/bin/npm_domain_check.py` in your **docker-machine**
+
+Note: not into container!
 ```bash
 sudo curl -o "/usr/local/bin/npm_domain_check.py" "https://raw.githubusercontent.com/AmaneSwiss/NPM-DomainCheckScript/refs/heads/main/scripts/npm_domain_check.py"
 sudo chmod +x /usr/local/bin/npm_domain_check.py
 ```
-3. Change line 10 in `npm_domain_check.py` from CONTAINER_NAME to container_name from step 1 (use `nano` for example)
+
+3. Change line 10 in `npm_domain_check.py` from CONTAINER_NAME to container_name from step 1
+
+Note: use `nano` for example
 ```py
 # Your 'Nginx Proxy Manager' container name here
 CONTAINER_NAME = "npm" # <- Change here
 ```
+
 4. Add a cron job to run the script continuously `sudo crontab -e` for edit the root cron table an add:
 ```bash
 # NPM domain-check
@@ -41,15 +50,18 @@ This will run the script every minute. You can change `* * * * *` to `*/5 * * * 
 
 ---
 ### To undo, follow these steps:
+
 1. Remove the cron job with `sudo crontab -e` and delete the added lines.
 ```bash
 # NPM domain-check # <- remove
 * * * * * /usr/local/bin/npm_domain_check.py # <- remove
 ```
+
 2. Remove the script and config file
 ```bash
 rm -f /usr/local/bin/npm_domain_check*
 ```
+
 3. Remove the created `domain` column using a Python script as well:
 
 [scripts/remove_domain_column.py](scripts/remove_domain_column.py)
@@ -57,11 +69,13 @@ rm -f /usr/local/bin/npm_domain_check*
 sudo curl -o "/tmp/remove_domain_column.py" "https://raw.githubusercontent.com/AmaneSwiss/NPM-DomainCheckScript/refs/heads/main/scripts/remove_domain_column.py"
 sudo chmod +x /tmp/remove_domain_column.py
 ```
+
 4. Change line 7 in `remove_domain_column.py` from CONTAINER_NAME to container_name
 ```py
 # Your 'Nginx Proxy Manager' container name here
 CONTAINER_NAME = "npm" # <- Change here
 ```
+
 5. Run script
 ```bash
 /tmp/remove_domain_column.py
